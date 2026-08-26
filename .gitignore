@@ -1,0 +1,5 @@
+/passpolicy
+/bin/
+*.test
+*.out
+.DS_Store
