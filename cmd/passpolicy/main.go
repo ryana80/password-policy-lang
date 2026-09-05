@@ -59,9 +59,12 @@ func main() {
 		}
 	}
 
+	score := policy.EstimateStrength(password)
+
 	violations := policy.Check(pol, password)
 	if len(violations) == 0 {
 		fmt.Println("ok")
+		fmt.Printf("strength: %.1f bits (%s)\n", score.Entropy, score.Strength)
 		return
 	}
 
@@ -69,5 +72,6 @@ func main() {
 	for _, v := range violations {
 		fmt.Printf("  - %s\n", v.Reason)
 	}
+	fmt.Printf("strength: %.1f bits (%s)\n", score.Entropy, score.Strength)
 	os.Exit(1)
 }
