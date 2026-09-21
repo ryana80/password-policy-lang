@@ -23,6 +23,34 @@ func TestFormatOmitsUnsetFields(t *testing.T) {
 	}
 }
 
+func TestFormatQuotesSymbols(t *testing.T) {
+	pol := &Policy{Symbols: `a"b\c`}
+	want := "symbols \"a\\\"b\\\\c\"\n"
+	if got := Format(pol); got != want {
+		t.Errorf("Format() = %q, want %q", got, want)
+	}
+}
+
+func TestFormatSymbolsIsIdempotentThroughParse(t *testing.T) {
+	src := `symbols "!@#$%^&*()"` + "\nrequire symbol\n"
+	pol, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	formatted := Format(pol)
+
+	reparsed, err := Parse(formatted)
+	if err != nil {
+		t.Fatalf("Parse(Format(pol)): %v", err)
+	}
+	if reparsed.Symbols != pol.Symbols {
+		t.Errorf("Symbols = %q, want %q", reparsed.Symbols, pol.Symbols)
+	}
+	if Format(reparsed) != formatted {
+		t.Errorf("formatting is not idempotent: %q != %q", Format(reparsed), formatted)
+	}
+}
+
 func TestFormatIsIdempotentThroughParse(t *testing.T) {
 	src := "require symbol, upper\nforbid whitespace\nforbid repeat\nmin_length 10\n"
 	pol, err := Parse(src)
@@ -120,6 +148,17 @@ func TestCheckForbidSequence(t *testing.T) {
 	}
 	if v := Check(pol, "userxzq"); len(v) != 0 {
 		t.Errorf("no run: got %v, want none", v)
+	}
+}
+
+func TestCheckRequireSymbolWithCustomSet(t *testing.T) {
+	pol := &Policy{Symbols: "!@#", Require: []CharClass{ClassSymbol}}
+
+	if v := Check(pol, "pass!word"); len(v) != 0 {
+		t.Errorf("'!' is in the symbol set: got %v, want none", v)
+	}
+	if v := Check(pol, "pass/word"); len(v) != 1 || v[0].Reason != "must contain at least one symbol character" {
+		t.Errorf("'/' is not in the symbol set: got %v", v)
 	}
 }
 

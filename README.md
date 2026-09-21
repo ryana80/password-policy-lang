@@ -23,6 +23,7 @@ One directive per line. Blank lines and `#` comments are ignored.
 # baseline account policy
 min_length 12
 max_length 128
+symbols "!@#$%^&*()-_=+"
 require upper, lower, digit, symbol
 forbid sequence
 forbid repeat
@@ -30,6 +31,10 @@ forbid whitespace
 ```
 
 - `min_length N` / `max_length N` — length bounds, each may appear once
+- `symbols "CHARS"` — restricts what counts as a `symbol` character for
+  `require symbol` to exactly the characters in the quoted string; without
+  it, any non-alphanumeric, non-whitespace character counts. May appear
+  once. The string supports `\"`, `\\`, `\n`, and `\t` escapes.
 - `require CLASS[, CLASS...]` — `upper`, `lower`, `digit`, `symbol`
 - `forbid RULE` — `sequence` (e.g. `abc`, `321`), `repeat` (e.g. `aaa`),
   or `whitespace`; may appear multiple times, once per rule
@@ -118,9 +123,10 @@ fmt.Printf("%.1f bits (%s)\n", score.Entropy, score.Strength)
 
 ## Status
 
-Early. The grammar covers length, required character classes, and a handful
-of forbidden patterns, plus an entropy-based strength estimate reported
-alongside the pass/fail result. See the issues for what's planned.
+Early. The grammar covers length, required character classes with an
+optional custom symbol set, and a handful of forbidden patterns, plus an
+entropy-based strength estimate reported alongside the pass/fail result.
+See the issues for what's planned.
 
 ## License
 

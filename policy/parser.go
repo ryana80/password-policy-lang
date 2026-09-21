@@ -45,8 +45,14 @@ var allRules = map[Rule]bool{
 type Policy struct {
 	MinLength int
 	MaxLength int
-	Require   []CharClass
-	Forbid    []Rule
+	// Symbols, if non-empty, is the exact set of characters that count as
+	// ClassSymbol for a require directive. Any other punctuation in a
+	// candidate password is ignored rather than treated as satisfying
+	// "require symbol". Empty means any non-alphanumeric, non-whitespace
+	// character counts, as before the directive existed.
+	Symbols string
+	Require []CharClass
+	Forbid  []Rule
 }
 
 type parser struct {
@@ -62,6 +68,7 @@ type parser struct {
 //
 //	min_length N
 //	max_length N
+//	symbols "CHARS"                exact character set for the symbol class
 //	require CLASS[, CLASS...]      upper | lower | digit | symbol
 //	forbid RULE                    sequence | repeat | whitespace
 func Parse(source string) (*Policy, error) {
@@ -112,6 +119,16 @@ func Parse(source string) (*Policy, error) {
 				return nil, err
 			}
 			pol.MaxLength = n
+			seen[name] = nameTok
+		case "symbols":
+			s, err := p.string()
+			if err != nil {
+				return nil, err
+			}
+			if s == "" {
+				return nil, &ParseError{Line: nameTok.Line, Col: nameTok.Col, Msg: "symbols must not be empty"}
+			}
+			pol.Symbols = s
 			seen[name] = nameTok
 		case "require":
 			classes, err := p.classList()
@@ -176,6 +193,18 @@ func (p *parser) number() (int, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+func (p *parser) string() (string, error) {
+	if p.tok.Kind != TokString {
+		return "", &ParseError{Line: p.tok.Line, Col: p.tok.Col,
+			Msg: fmt.Sprintf("expected a quoted string, found %s", p.tok.Kind)}
+	}
+	s := p.tok.Text
+	if err := p.step(); err != nil {
+		return "", err
+	}
+	return s, nil
 }
 
 func (p *parser) classList() ([]CharClass, error) {

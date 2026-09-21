@@ -20,6 +20,9 @@ func Format(pol *Policy) string {
 	if pol.MaxLength > 0 {
 		fmt.Fprintf(&b, "max_length %d\n", pol.MaxLength)
 	}
+	if pol.Symbols != "" {
+		fmt.Fprintf(&b, "symbols %s\n", quoteString(pol.Symbols))
+	}
 	if len(pol.Require) > 0 {
 		classes := make([]string, len(pol.Require))
 		for i, c := range pol.Require {
@@ -38,6 +41,29 @@ func Format(pol *Policy) string {
 		fmt.Fprintf(&b, "forbid %s\n", r)
 	}
 
+	return b.String()
+}
+
+// quoteString renders s as a policy-language string literal, escaping the
+// characters that would otherwise end the literal early or need decoding.
+func quoteString(s string) string {
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range s {
+		switch r {
+		case '"':
+			b.WriteString(`\"`)
+		case '\\':
+			b.WriteString(`\\`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
 	return b.String()
 }
 
@@ -64,6 +90,14 @@ func Check(pol *Policy, password string) []Violation {
 		})
 	}
 
+	var symbolSet map[rune]bool
+	if pol.Symbols != "" {
+		symbolSet = make(map[rune]bool, len(pol.Symbols))
+		for _, r := range pol.Symbols {
+			symbolSet[r] = true
+		}
+	}
+
 	present := map[CharClass]bool{}
 	for _, r := range runes {
 		switch {
@@ -76,7 +110,9 @@ func Check(pol *Policy, password string) []Violation {
 		case unicode.IsSpace(r):
 			// whitespace is its own forbid rule, not a required class
 		default:
-			present[ClassSymbol] = true
+			if symbolSet == nil || symbolSet[r] {
+				present[ClassSymbol] = true
+			}
 		}
 	}
 	for _, c := range pol.Require {

@@ -63,6 +63,27 @@ require lower
 	}
 }
 
+func TestParseSymbols(t *testing.T) {
+	pol, err := Parse(`symbols "!@#$"` + "\n")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if pol.Symbols != "!@#$" {
+		t.Errorf("Symbols = %q, want %q", pol.Symbols, "!@#$")
+	}
+}
+
+func TestParseSymbolsEscapes(t *testing.T) {
+	pol, err := Parse(`symbols "a\"b\\c\td\ne"` + "\n")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	want := "a\"b\\c\td\ne"
+	if pol.Symbols != want {
+		t.Errorf("Symbols = %q, want %q", pol.Symbols, want)
+	}
+}
+
 func TestParseDirectiveOrderDoesNotMatterForOutput(t *testing.T) {
 	src := "require symbol, upper\nforbid whitespace\nforbid repeat\n"
 	pol, err := Parse(src)
@@ -150,6 +171,36 @@ func TestParseErrors(t *testing.T) {
 			src:      "min_length 20\nmax_length 10\n",
 			wantLine: 1, wantCol: 1,
 			wantMsg: `min_length (20) is greater than max_length (10)`,
+		},
+		{
+			name:     "symbols wants a string",
+			src:      "symbols 12\n",
+			wantLine: 1, wantCol: 9,
+			wantMsg: `expected a quoted string, found number`,
+		},
+		{
+			name:     "empty symbols",
+			src:      `symbols ""` + "\n",
+			wantLine: 1, wantCol: 1,
+			wantMsg: `symbols must not be empty`,
+		},
+		{
+			name:     "unterminated string",
+			src:      "symbols \"abc\n",
+			wantLine: 1, wantCol: 9,
+			wantMsg: `unterminated string`,
+		},
+		{
+			name:     "unknown escape sequence",
+			src:      `symbols "a\qb"` + "\n",
+			wantLine: 1, wantCol: 11,
+			wantMsg: `unknown escape sequence \q`,
+		},
+		{
+			name:     "duplicate symbols",
+			src:      `symbols "!" ` + "\nsymbols \"@\"\n",
+			wantLine: 2, wantCol: 1,
+			wantMsg: `"symbols" was already set at 1:1`,
 		},
 	}
 

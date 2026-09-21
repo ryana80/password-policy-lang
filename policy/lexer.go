@@ -12,6 +12,7 @@ const (
 	TokEOF TokenKind = iota
 	TokIdent
 	TokNumber
+	TokString
 	TokComma
 	TokNewline
 )
@@ -24,6 +25,8 @@ func (k TokenKind) String() string {
 		return "identifier"
 	case TokNumber:
 		return "number"
+	case TokString:
+		return "quoted string"
 	case TokComma:
 		return "comma"
 	case TokNewline:
@@ -118,6 +121,50 @@ func isDigit(r rune) bool {
 	return r >= '0' && r <= '9'
 }
 
+// stringToken scans a double-quoted string starting after the opening
+// quote has been peeked but not yet consumed. It recognizes \", \\, \n,
+// and \t; any other backslash escape is an error. A string may not span
+// a newline, so an unterminated string is always caught before it can
+// swallow the rest of the document.
+func (l *lexer) stringToken(line, col int) (Token, error) {
+	l.advance() // opening quote
+	var sb strings.Builder
+	for {
+		c := l.peek()
+		if c == 0 || c == '\n' {
+			return Token{}, &ParseError{Line: line, Col: col, Msg: "unterminated string"}
+		}
+		if c == '"' {
+			l.advance()
+			return Token{Kind: TokString, Text: sb.String(), Line: line, Col: col}, nil
+		}
+		if c == '\\' {
+			escLine, escCol := l.line, l.col
+			l.advance()
+			esc := l.peek()
+			if esc == 0 || esc == '\n' {
+				return Token{}, &ParseError{Line: line, Col: col, Msg: "unterminated string"}
+			}
+			switch esc {
+			case '"':
+				sb.WriteByte('"')
+			case '\\':
+				sb.WriteByte('\\')
+			case 'n':
+				sb.WriteByte('\n')
+			case 't':
+				sb.WriteByte('\t')
+			default:
+				return Token{}, &ParseError{Line: escLine, Col: escCol, Msg: fmt.Sprintf("unknown escape sequence \\%c", esc)}
+			}
+			l.advance()
+			continue
+		}
+		sb.WriteRune(c)
+		l.advance()
+	}
+}
+
 // next returns the next token, or an error if the input contains a
 // character that cannot begin any valid token. Comments (# to end of
 // line) and horizontal whitespace are skipped; newlines are significant,
@@ -162,6 +209,8 @@ func (l *lexer) next() (Token, error) {
 			l.advance()
 		}
 		return Token{Kind: TokIdent, Text: string(l.src[start:l.pos]), Line: line, Col: col}, nil
+	case r == '"':
+		return l.stringToken(line, col)
 	default:
 		l.advance()
 		return Token{}, &ParseError{Line: line, Col: col, Msg: fmt.Sprintf("unexpected character %q", r)}
