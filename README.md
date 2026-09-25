@@ -99,6 +99,34 @@ bad-policy.txt:2:16: unknown character class "lowr" (want upper, lower, digit, o
                    ^
 ```
 
+Pass `-json` for scripting: the check result, `-pretty` output, and any
+error all come back as JSON instead of text, on stdout for a result and
+stderr for an error, so a caller never has to sniff which stream to parse.
+
+```
+$ ./passpolicy -json policy.txt 'password'
+{
+  "ok": false,
+  "violations": [
+    "must be at least 12 characters (got 8)",
+    "must contain at least one upper character",
+    "must contain at least one digit character",
+    "must contain at least one symbol character"
+  ],
+  "strength": {
+    "bits": 37.6,
+    "rating": "fair"
+  }
+}
+
+$ ./passpolicy -json bad-policy.txt secret
+{
+  "error": "bad-policy.txt: unknown character class \"lowr\" (want upper, lower, digit, or symbol)",
+  "line": 2,
+  "col": 16
+}
+```
+
 ## Library
 
 The `policy` package has no dependency on the `passpolicy` binary and can be
